@@ -24,6 +24,10 @@ RUN apt-get update
 RUN apt-get install -y python3-pip
 RUN pip3 install --upgrade pip
 
+# ROS2 yells a warning with a version of setuptools that is too high.
+# So intentially use an olderversion
+RUN pip3 install setuptools==58.2.0
+
 # Now switch to non-root user "ros"
 USER $USERNAME
 RUN mkdir -p $WORKSPACE

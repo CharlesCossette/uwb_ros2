@@ -1,0 +1,13 @@
+std_msgs/Header header 
+float32 range
+uint8 from_id
+uint8 to_id
+float32 covariance
+uint64 tx1
+uint64 rx1
+uint64 tx2
+uint64 rx2
+uint64 tx3
+uint64 rx3
+float32 power1
+float32 power2
