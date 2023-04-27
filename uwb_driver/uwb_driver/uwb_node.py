@@ -4,37 +4,19 @@ from uwb_msgs.msg import RangeStamped, PassiveStamped
 import rclpy
 from rclpy.node import Node
 from rclpy.exceptions import ROSInterruptException
-from schedulers import CommonListScheduler
+from uwb_driver.schedulers import CommonListScheduler
 from time import sleep
 import threading
 
 class UwbModuleNode(Node):
     def __init__(self):
-        super().__init__("uwb")
+        super().__init__("uwb_node")
 
-        
-    # def load_params(self):
-    #     if not rospy.has_param("/uwb/scheduler"):
-    #         rospy.loginfo(
-    #             "Did not detect required params on parameter server. Loading from YAML file."
-    #         )
-    #         rp = rospkg.RosPack()
-    #         path = rp.get_path("uwb_ros")
-    #         filename = path + "/config/params.yaml"
+        self.declare_parameter("scheduler", "slow")
+        self.declare_parameter("max_id", 10)
+        self.declare_parameter("frequency", 100)
 
-    #         with open(filename) as file:
-    #             params = yaml.safe_load(file)
-
-    #         if not "ports" in params.keys():
-    #             params["ports"] = []
-
-    #         if params["ports"] is None:
-    #             params["ports"] = []
-
-
-    #         rospy.set_param("/uwb/", params)
     def start(self):
-        # self.load_params()
 
         ports = find_uwb_serial_ports()
         while len(ports) == 0 and rclpy.ok():
@@ -43,7 +25,7 @@ class UwbModuleNode(Node):
             if rclpy.ok():
                 ports = find_uwb_serial_ports()
 
-        self.modules = [UwbModule(port, timeout=0.1, verbose=False, threaded=False) for port in ports]\
+        self.modules = [UwbModule(port, timeout=0.1, verbose=False, threaded=False) for port in ports]
 
         # Get my ids
         self.my_ids = [module.get_id()["id"] for module in self.modules]
@@ -56,13 +38,12 @@ class UwbModuleNode(Node):
             self.get_logger().warn(
                 "Could not find any neighbours. Will keep trying"
             )
-            sleep(5)
+            sleep(3)
             if rclpy.ok():
                 self.neighbour_ids = self.discover()
 
         # Create single publisher for the range measurements
         self.range_pub = self.create_publisher(RangeStamped,"uwb/range",1)
-
 
         # Create single publisher for the passive measurements
         self.passive_pub = self.create_publisher(PassiveStamped, "uwb/passing", 1) 
@@ -75,22 +56,18 @@ class UwbModuleNode(Node):
             + str(self.neighbour_ids)
         )
 
-        # if not rospy.has_param("/uwb/scheduler"):
-        #     rospy.logerr("No scheduler specified in param file. Exiting.")
-        # else:
-        #     scheduler = rospy.get_param("/uwb/scheduler")
-        #     if scheduler == "slow":
-        self.start_slow_scheduler()
-
-        #     elif scheduler == "common_list":
-        # seq = [
-        #     (x["from_id"], x["to_id"])
-        #     for x in rospy.get_param("/uwb/sequence")
-        # ]
-        # scheduler = CommonListScheduler(
-        #     self.modules, self.my_ids, seq, self.publish_range, self.publish_passive
-        # )
-        # scheduler.start()
+        if self.get_parameter("scheduler").value == "slow":
+            self.start_slow_scheduler()
+        elif self.get_parameter("scheduler").value == "common_list":
+            # seq = [
+            #     (x["from_id"], x["to_id"])
+            #     for x in rospy.get_param("/uwb/sequence")
+            # ]
+            # scheduler = CommonListScheduler(
+            #     self.modules, self.my_ids, seq, self.publish_range, self.publish_passive
+            # )
+            # scheduler.start()
+            pass
 
     def discover(self):
         """
@@ -98,13 +75,9 @@ class UwbModuleNode(Node):
         """
         # Get neighbours
         neighbour_ids = []
-        # if rospy.has_param("/uwb/max_id"):
-        #     max_id = rospy.get_param("/uwb/max_id")
-        # else:
-        #     rospy.logwarn("Max tag ID not specified in param file. Using 10.")
-        max_id = 10
+        max_id = self.get_parameter("max_id").value
 
-        rate = self.create_rate(1/1.5)
+        rate = self.create_rate(3)
         for i in range(max_id):
             if i in self.my_ids:
                 idx = self.my_ids.index(i)
@@ -174,7 +147,8 @@ class UwbModuleNode(Node):
         Starts the naive "slow" scheduling scheme where we simply range at such
         a low frequency that the odds of collisions are low.
         """
-        rate = self.create_rate(50 / (len(self.neighbour_ids) + 1))
+        range_freq = self.get_parameter("frequency").value
+        rate = self.create_rate(range_freq)
         while rclpy.ok():
             for i, uwb in enumerate(self.modules):
                 my_id = self.my_ids[i]
@@ -190,8 +164,7 @@ class UwbModuleNode(Node):
                     except ROSInterruptException:
                         pass
 
-
-if __name__ == "__main__":
+def main():
     rclpy.init()
 
     # Spin in a separate thread
@@ -203,3 +176,7 @@ if __name__ == "__main__":
 
 
     node.start()
+
+
+if __name__ == "__main__":
+    main()

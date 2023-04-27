@@ -1,0 +1,13 @@
+/uwb_node:
+  ros__parameters:
+
+    ####################################################################
+    # Choose a decentralized scheduling scheme.
+    ####################################################################
+    scheduler: "slow" # only one that works right now
+    #scheduler: "common_list"
+    #scheduler: "hot_potato"
+
+    ####################################################################
+    frequency: 100 # ranging frequency in  hz
+    max_id: 10 #Max possible module ID in the area (used for neighbor discovery)

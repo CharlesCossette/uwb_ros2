@@ -43,5 +43,5 @@
     ],
 
 	// Install uwb_driver, build workspace, and source setup.bash (add it to bashrc)
-	"postCreateCommand": "cd uwb_ros2/uwb_driver && pip install . && cd ~/workspace && colcon build && echo 'source ~/workspace/install/setup.bash' >> ~/.bashrc"
+	"postCreateCommand": "cd uwb_ros2/uwb_driver && pip install . && cd ~/workspace && colcon build --symlink-install && echo 'source ~/workspace/install/setup.bash' >> ~/.bashrc"
 }
