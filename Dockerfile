@@ -13,7 +13,8 @@ RUN groupadd --gid $USER_GID $USERNAME \
 RUN apt-get update \
     && apt-get install -y sudo git-core bash-completion \
     && echo $USERNAME ALL=\(root\) NOPASSWD:ALL > /etc/sudoers.d/$USERNAME\
-    && chmod 0440 /etc/sudoers.d/$USERNAME
+    && chmod 0440 /etc/sudoers.d/$USERNAME \
+    && sudo usermod -a -G dialout $USERNAME
 
 # We are still the root user at this point. install pip.
 # ROS2 yells a warning with a version of setuptools that is too high.
@@ -33,6 +34,8 @@ USER $USERNAME
 RUN mkdir -p $WORKSPACE
 WORKDIR $WORKSPACE
 
+# Use same dockerfile for both development and runtime
+# https://blog.atulr.com/docker-local-production-image/
 FROM development as run
 USER $USERNAME
 RUN mkdir uwb_ros2
