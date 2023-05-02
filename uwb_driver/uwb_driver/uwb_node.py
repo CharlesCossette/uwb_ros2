@@ -20,8 +20,8 @@ class UwbModuleNode(Node):
 
         ports = find_uwb_serial_ports()
         while len(ports) == 0 and rclpy.ok():
-            self.get_logger().warn("No UWB modules found. Will keep trying.", once=True)
-            sleep(2)
+            self.get_logger().warn("No UWB modules found. Will keep trying.")
+            sleep(3)
             if rclpy.ok():
                 ports = find_uwb_serial_ports()
 
@@ -150,10 +150,14 @@ class UwbModuleNode(Node):
         range_freq = self.get_parameter("frequency").value
         rate = self.create_rate(range_freq)
         while rclpy.ok():
-            for i, uwb in enumerate(self.modules):
-                my_id = self.my_ids[i]
-                for nb_id in self.neighbour_ids:
-                    if nb_id != my_id:
+ 
+            # Loop through all the neighbors
+            for nb_id in self.neighbour_ids:
+
+                # Loop through the  modules attached to our machine
+                for i, uwb in enumerate(self.modules):
+                    my_id = self.my_ids[i]
+                    if nb_id not in self.my_ids: # No self-ranging.
 
                         range_data = uwb.do_twr(target_id=nb_id, mult_twr=True)
                         if range_data["is_valid"]:
