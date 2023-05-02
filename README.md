@@ -32,15 +32,20 @@ Now we must start a container but also do a few things while doing so:
 - bind mount this source directory to the workspace in the container
 - mount the local /dev/ directory to /dev/ in the container (for USB device access)
 
-    docker run -it --mount type=bind,src="$(pwd)",target=/home/ros/workspace/src/uwb_ros2/ -v /dev:/dev uwb_ros_dev /bin/bash
-    cd ~/workspace/src/uwb_ros2/uwb_driver 
-    pip3 install .
-    cd ~/workspace
-    colcon build --symlink-install
-    source ./install/setup.bash
-    ros2 run uwb_driver uwb_node
+```bash
+docker run -it --mount type=bind,src="$(pwd)",target=/home/ros/workspace/src/uwb_ros2/ -v /dev:/dev uwb_ros_dev /bin/bash
+```
+Now in any editor, you can modify the node's source code and it will be reflected instantly in the container. In the terminal that originated from the previous command, install dependences and run the node with
+```bash
+cd ~/workspace/src/uwb_ros2/uwb_driver 
+pip3 install .
+cd ~/workspace
+colcon build --symlink-install
+source ./install/setup.bash
+ros2 run uwb_driver uwb_node
+```
 
-Now in any editor, you can modify the node's source code and it will be reflected instantly in the container.
+
 
 
 ## TODOs
