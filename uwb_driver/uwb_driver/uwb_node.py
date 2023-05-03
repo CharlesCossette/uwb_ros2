@@ -78,12 +78,12 @@ class UwbModuleNode(Node):
         max_id = self.get_parameter("max_id").value
 
         rate = self.create_rate(3)
-        for i in range(max_id):
+        for i in range(max_id + 1):
             if i in self.my_ids:
                 idx = self.my_ids.index(i)
                 uwb = self.modules[idx]
                 tag_ids = uwb.do_discovery(
-                    possible_ids = range(max_id)
+                    possible_ids = range(max_id + 1)
                 )
                 self.get_logger().debug(
                     "Tag "
