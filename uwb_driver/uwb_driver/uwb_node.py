@@ -12,11 +12,11 @@ class UwbModuleNode(Node):
     def __init__(self):
         super().__init__("uwb_node")
 
-        self.declare_parameter("scheduler", "common_list")#TODO
+        self.declare_parameter("scheduler", "slow")
         self.declare_parameter("max_id", 12)
         self.declare_parameter("frequency", 100)
-        self.declare_parameter("from_id_sequence", [9,9,9])#TODO, rclpy.Parameter.Type.INTEGER_ARRAY)
-        self.declare_parameter("to_id_sequence", [3,12,3])#TODO, rclpy.Parameter.Type.INTEGER_ARRAY)
+        self.declare_parameter("from_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
+        self.declare_parameter("to_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
 
     def start(self):
 
@@ -173,7 +173,11 @@ class UwbModuleNode(Node):
             self.get_parameter("to_id_sequence").get_parameter_value().integer_array_value
         ))
         scheduler = CommonListScheduler(
-            self.modules, self.my_ids, seq, self.publish_range, self.publish_passive
+            self.modules, 
+            self.my_ids, 
+            seq, 
+            self.publish_range, 
+            self.publish_passive,
         )
 
         scheduler._latest_pair = None

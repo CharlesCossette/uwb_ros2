@@ -25,6 +25,7 @@ class CommonListScheduler:
         self._sequence = sequence
         self._publish_range = publish_func_range
         self._publish_passive = publish_func_passive
+        self._logger = rclpy.logging.get_logger("rclpy")
         self._latest_pair = None
         self._ranging_event = False
 
@@ -104,13 +105,7 @@ class CommonListScheduler:
                 self._publish_range(next_pair, range_data)
                 self._latest_pair = next_pair
             else:
-                #TODO
-                # rclpy.logging.get_logger("rclpy").debug(
-                #     "TWR failed for pair " + str(next_pair)
-                # )
-                pass
-
-                # rospy.logdebug("TWR failed for pair " + str(next_pair))
+                self._logger.warn("TWR failed for pair " + str(next_pair))
 
     def get_next_pair(self, current_pair):
         """
@@ -128,12 +123,10 @@ class CommonListScheduler:
             next_pair = self._sequence[idx]
 
         else:
-            #TODO
-            # rospy.logwarn(
-            #     "Detected a ranging pair that is not in my sequence. "
-            #     + "Starting from beginning."
-            # )
-            pass
+            self._logger.warn(
+                "Detected a ranging pair that is not in my sequence. \
+                Starting from beginning."
+            )
             next_pair = self._sequence[0]
             
         return next_pair

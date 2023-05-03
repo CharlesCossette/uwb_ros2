@@ -1,13 +1,12 @@
-#TODO: this is not being used for now
 /uwb_node:
   ros__parameters:
 
     ####################################################################
     # Choose a decentralized scheduling scheme.
     ####################################################################
-    # scheduler: "slow" # only one that works right now
+    # scheduler: "slow" 
     scheduler: "common_list"
-    #scheduler: "hot_potato"
+    #scheduler: "hot_potato" # not supported yet
 
     ####################################################################
     frequency: 100 # ranging frequency in hz
