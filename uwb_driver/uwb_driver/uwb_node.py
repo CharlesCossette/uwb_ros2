@@ -12,9 +12,11 @@ class UwbModuleNode(Node):
     def __init__(self):
         super().__init__("uwb_node")
 
-        self.declare_parameter("scheduler", "slow")
+        self.declare_parameter("scheduler", "common_list")#TODO
         self.declare_parameter("max_id", 12)
         self.declare_parameter("frequency", 100)
+        self.declare_parameter("from_id_sequence", [9,9,9])#TODO, rclpy.Parameter.Type.INTEGER_ARRAY)
+        self.declare_parameter("to_id_sequence", [3,12,3])#TODO, rclpy.Parameter.Type.INTEGER_ARRAY)
 
     def start(self):
 
@@ -59,15 +61,7 @@ class UwbModuleNode(Node):
         if self.get_parameter("scheduler").value == "slow":
             self.start_slow_scheduler()
         elif self.get_parameter("scheduler").value == "common_list":
-            # seq = [
-            #     (x["from_id"], x["to_id"])
-            #     for x in rospy.get_param("/uwb/sequence")
-            # ]
-            # scheduler = CommonListScheduler(
-            #     self.modules, self.my_ids, seq, self.publish_range, self.publish_passive
-            # )
-            # scheduler.start()
-            pass
+            self.start_common_list_scheduler()
 
     def discover(self):
         """
@@ -169,6 +163,69 @@ class UwbModuleNode(Node):
                         rate.sleep()
                     except ROSInterruptException:
                         pass
+
+    def start_common_list_scheduler(self):
+        """
+        Starts the distributed scheduling scheme.
+        """
+        seq = list(zip(
+            self.get_parameter("from_id_sequence").get_parameter_value().integer_array_value,
+            self.get_parameter("to_id_sequence").get_parameter_value().integer_array_value
+        ))
+        scheduler = CommonListScheduler(
+            self.modules, self.my_ids, seq, self.publish_range, self.publish_passive
+        )
+
+        scheduler._latest_pair = None
+        for i, uwb in enumerate(scheduler._modules):
+            # Just for type hinting
+            uwb: UwbModule = uwb
+            
+            my_id = scheduler._my_ids[i]
+            uwb.toggle_passive(True)
+            uwb.register_listening_callback(scheduler.listening_callback, my_id)
+            uwb.register_range_callback(scheduler.ranging_with_me_callback, my_id)
+            uwb.device.timeout = 0.003
+
+        # Initialize the scheme
+        # below may be confusing. we are sending this function the last pair
+        # in the sequence so that the next pair is the first in the sequence.
+        # We are reusing this function for starting the scheme
+        scheduler.handle_ranging_event(scheduler._sequence[-1])
+
+        while rclpy.ok():
+ 
+            # Keep checking the modules for external messages until a timeout
+            # expires.
+            start_time = self.get_clock().now().nanoseconds/1e9
+            timeout = 0.07
+            while (self.get_clock().now().nanoseconds/1e9 - start_time) < timeout and rclpy.ok():
+
+                for uwb in scheduler._modules:
+                    uwb.wait_for_messages()
+
+                    if scheduler._ranging_event:
+                        # Reset the message event flag
+                        scheduler._ranging_event = False
+
+                        # Initiate next ranging if it is our turn
+                        scheduler.handle_ranging_event(scheduler._latest_pair)                        
+
+                        # Reset the timeout. Stays in this while loop
+                        start_time = self.get_clock().now().nanoseconds/1e9
+                    
+            # If we got here, its been a while since we have heard a range meas.
+            # Advance to the next item on the list and initiate if it is our
+            # turn
+            scheduler._latest_pair = scheduler.get_next_pair(scheduler._latest_pair)
+            self.get_logger().debug(
+                "Ranging timeout. Restarting from latest pair: " \
+                + str(scheduler._latest_pair)
+            )
+
+            # Internally, the below function will check if we need to
+            # initate ranging.
+            scheduler.handle_ranging_event(scheduler._latest_pair)
 
 def main():
     rclpy.init()
