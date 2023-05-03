@@ -13,7 +13,7 @@ class UwbModuleNode(Node):
         super().__init__("uwb_node")
 
         self.declare_parameter("scheduler", "slow")
-        self.declare_parameter("max_id", 10)
+        self.declare_parameter("max_id", 12)
         self.declare_parameter("frequency", 100)
 
     def start(self):
@@ -82,7 +82,9 @@ class UwbModuleNode(Node):
             if i in self.my_ids:
                 idx = self.my_ids.index(i)
                 uwb = self.modules[idx]
-                tag_ids = uwb.do_discovery()
+                tag_ids = uwb.do_discovery(
+                    possible_ids = range(max_id)
+                )
                 self.get_logger().debug(
                     "Tag "
                     + str(self.my_ids[idx])
