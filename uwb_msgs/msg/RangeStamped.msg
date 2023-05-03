@@ -1,7 +1,7 @@
 std_msgs/Header header 
 float32 range
-uint8 from_id
-uint8 to_id
+uint64 from_id
+uint64 to_id
 float32 covariance
 uint64 tx1
 uint64 rx1

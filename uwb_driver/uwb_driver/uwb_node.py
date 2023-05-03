@@ -7,6 +7,54 @@ from rclpy.exceptions import ROSInterruptException
 from uwb_driver.schedulers import CommonListScheduler
 from time import sleep
 import threading
+import pypozyx
+
+
+class PozyxModule:
+    """
+    Wrapper class to give the pozyx module the same interface as the UwbModule.
+    """
+    def __init__(self, port: str, timeout=0.1):
+        self._pozyx = pypozyx.PozyxSerial(port, timeout=timeout)
+
+    def get_id(self):
+        who_am_i = pypozyx.NetworkID()
+        status = self._pozyx.getWhoAmI(who_am_i)
+        if status == pypozyx.POZYX_SUCCESS:
+            return {"id": who_am_i.id, "is_valid": True}
+        else:
+            return {"id": None, "is_valid": False}
+        
+    def do_discovery(self, *_, **__): # Discover all other pozyx devices
+        self._pozyx.clearDevices()
+        self._pozyx.doDiscoveryAll()
+        device_list_size = pypozyx.SingleRegister()
+        self._pozyx.getDeviceListSize(device_list_size, )
+        device_list = pypozyx.DeviceList(list_size=device_list_size.value)
+        self._pozyx.getDeviceIds(device_list)
+        return [device_list.data[i] for i in range(device_list_size.value)]
+    
+    def do_twr(self, target_id, *_, **__):
+        range_data = pypozyx.DeviceRange()
+        status = self._pozyx.doRanging(target_id, range_data)
+        if status == pypozyx.POZYX_SUCCESS:
+            return {
+                "range": range_data.distance/1000,
+                "is_valid": True,
+                "tx1": range_data.timestamp,
+                "rx1": 0,
+                "tx2": 0,
+                "rx2": 0,
+                "tx3": 0,
+                "rx3": 0,
+                "Pr1": float(range_data.RSS),
+                "Pr2": 0.0, 
+                }
+        else:
+            return {
+                "range": None,
+                "is_valid": False,
+            }
 
 class UwbModuleNode(Node):
     def __init__(self):
@@ -14,18 +62,32 @@ class UwbModuleNode(Node):
 
         self.declare_parameter("scheduler", "slow")
         self.declare_parameter("max_id", 10)
-        self.declare_parameter("frequency", 100)
+        self.declare_parameter("frequency", 200)
 
     def start(self):
 
-        ports = find_uwb_serial_ports()
-        while len(ports) == 0 and rclpy.ok():
+        self.modules = []
+
+        # Give priority to our modules. If not found, check pozyx.
+        while len(self.modules) == 0 and rclpy.ok():
+
+            self.get_logger().info("Checking for UWB modules...")
+            ports = find_uwb_serial_ports()
+            if len(ports) > 0:
+                self.get_logger().info("Found UWB modules: " + str(ports))
+                self.modules = [UwbModule(port, timeout=0.1, verbose=False, threaded=False) for port in ports]
+                break
+
+            self.get_logger().info("Checking for pozyx modules...")
+            pozyx_ports = pypozyx.get_serial_ports()
+            pozyx_ports = [p.device for p in pozyx_ports]
+            if len(pozyx_ports) > 0:
+                self.get_logger().info("Found pozyx modules: " + str(pozyx_ports))
+                self.modules = [PozyxModule(p) for p in pozyx_ports]
+                break
+
             self.get_logger().warn("No UWB modules found. Will keep trying.")
             sleep(3)
-            if rclpy.ok():
-                ports = find_uwb_serial_ports()
-
-        self.modules = [UwbModule(port, timeout=0.1, verbose=False, threaded=False) for port in ports]
 
         # Get my ids
         self.my_ids = [module.get_id()["id"] for module in self.modules]
@@ -50,11 +112,13 @@ class UwbModuleNode(Node):
 
         # Output neighbour-discovery results 
         self.get_logger().info(
-            "UWB node init success. Tags on machine: "
+            "UWB node initialization success. Tags on machine: "
             + str(self.my_ids)
             + ". Neighbors: "
             + str(self.neighbour_ids)
         )
+
+        self.get_logger().info("Starting scheduler...")
 
         if self.get_parameter("scheduler").value == "slow":
             self.start_slow_scheduler()
@@ -78,18 +142,15 @@ class UwbModuleNode(Node):
         max_id = self.get_parameter("max_id").value
 
         rate = self.create_rate(3)
-        for i in range(max_id):
-            if i in self.my_ids:
-                idx = self.my_ids.index(i)
-                uwb = self.modules[idx]
-                tag_ids = uwb.do_discovery()
-                self.get_logger().debug(
-                    "Tag "
-                    + str(self.my_ids[idx])
-                    + " has discovered "
-                    + str(tag_ids)
-                )
-                neighbour_ids.extend(tag_ids)
+        for i, uwb in enumerate(self.modules):
+            tag_ids = uwb.do_discovery(list(range(max_id)))
+            self.get_logger().info(
+                "Tag "
+                + str(self.my_ids[i])
+                + " has discovered "
+                + str(tag_ids)
+            )
+            neighbour_ids.extend(tag_ids)
                 
             if not rclpy.ok():
                 break

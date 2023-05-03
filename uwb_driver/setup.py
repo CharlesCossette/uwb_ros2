@@ -14,7 +14,8 @@ setup(
     
     install_requires=[
         "setuptools",
-        "pyuwb @ git+https://bitbucket.org/decargroup/uwb_interface@main"
+        "pyuwb @ git+https://bitbucket.org/decargroup/uwb_interface@main",
+        "pypozyx"
     ],
     zip_safe=True,
     maintainer='ros',
