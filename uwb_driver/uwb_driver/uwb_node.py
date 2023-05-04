@@ -48,7 +48,7 @@ class UwbModuleNode(Node):
         self.range_pub = self.create_publisher(RangeStamped,"uwb/range",1)
 
         # Create single publisher for the passive measurements
-        self.passive_pub = self.create_publisher(PassiveStamped, "uwb/passing", 1) 
+        self.passive_pub = self.create_publisher(PassiveStamped, "uwb/passive", 1) 
 
         # Output neighbour-discovery results 
         self.get_logger().info(
@@ -107,8 +107,10 @@ class UwbModuleNode(Node):
             range_msg.rx2 = range_data["rx2"]
             range_msg.tx3 = range_data["tx3"]
             range_msg.rx3 = range_data["rx3"]
-            range_msg.power1 = range_data["Pr1"]
-            range_msg.power2 = range_data["Pr2"]
+            range_msg.fpp1 = range_data["fpp1"]
+            range_msg.fpp2 = range_data["fpp2"]
+            range_msg.skew1 = range_data["skew1"]
+            range_msg.skew2 = range_data["skew2"]
             self.range_pub.publish(range_msg)
 
     def publish_passive(self, pair_ids, passive_data, my_id):
@@ -126,11 +128,16 @@ class UwbModuleNode(Node):
         passive_msg.rx2_n = passive_data["rx2_n"]
         passive_msg.tx3_n = passive_data["tx3_n"]
         passive_msg.rx3_n = passive_data["rx3_n"]
-        passive_msg.pr1 = passive_data["Pr1"]
-        passive_msg.pr2 = passive_data["Pr2"]
-        passive_msg.pr3 = passive_data["Pr3"]
-        passive_msg.pr1_n = passive_data["Pr1_n"]
-        passive_msg.pr2_n = passive_data["Pr2_n"]
+        passive_msg.pr1 = passive_data["fpp1"]
+        passive_msg.pr2 = passive_data["fpp2"]
+        passive_msg.pr3 = passive_data["fpp3"]
+        passive_msg.skew1 = passive_data["skew1"]
+        passive_msg.skew2 = passive_data["skew2"]
+        passive_msg.skew3 = passive_data["skew3"]
+        passive_msg.pr1_n = passive_data["fpp1_n"]
+        passive_msg.pr2_n = passive_data["fpp2_n"]
+        passive_msg.skew1_n = passive_data["skew1_n"]
+        passive_msg.skew2_n = passive_data["skew2_n"]
         self.passive_pub.publish(passive_msg)
 
     def shutdown_hook(self):
@@ -175,7 +182,7 @@ class UwbModuleNode(Node):
         scheduler = CommonListScheduler(
             self.modules, 
             self.my_ids, 
-            seq, 
+            seq,
             self.publish_range, 
             self.publish_passive,
         )
