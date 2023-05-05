@@ -49,11 +49,16 @@ class CommonListScheduler:
             msg['rx2_n'] = data[8]
             msg['tx3_n'] = data[9]
             msg['rx3_n'] = data[10]
-            msg['Pr1'] = data[11]
-            msg['Pr2'] = data[12]
-            msg['Pr3'] = data[13]
-            msg['Pr1_n'] = data[14]
-            msg['Pr2_n'] = data[15]
+            msg['fpp1'] = data[11]
+            msg['fpp2'] = data[12]
+            msg['fpp3'] = data[13]
+            msg['skew1'] = data[14]
+            msg['skew2'] = data[15]
+            msg['skew3'] = data[16]
+            msg['fpp1_n'] = data[17]
+            msg['fpp2_n'] = data[18]
+            msg['skew1_n'] = data[19]
+            msg['skew2_n'] = data[20]
             self._publish_passive(self._latest_pair, msg, my_id)
 
     def ranging_with_me_callback(self, data, my_id):
@@ -73,8 +78,10 @@ class CommonListScheduler:
             msg['rx2'] = data[5]
             msg['tx3'] = data[6]
             msg['rx3'] = data[7]
-            msg['Pr1'] = data[8]
-            msg['Pr2'] = data[9]
+            msg['fpp1'] = data[8]
+            msg['fpp2'] = data[9]
+            msg['skew1'] = data[10]
+            msg['skew2'] = data[11]
             self._publish_range(self._latest_pair, msg)
 
     def handle_ranging_event(self, most_recent_pair):

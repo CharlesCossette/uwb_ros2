@@ -15,5 +15,10 @@ uint64 rx3_n
 float32 pr1
 float32 pr2
 float32 pr3
+float32 skew1
+float32 skew2
+float32 skew3
 float32 pr1_n
 float32 pr2_n 
+float32 skew1_n
+float32 skew2_n
