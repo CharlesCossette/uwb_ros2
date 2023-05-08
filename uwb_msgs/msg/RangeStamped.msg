@@ -9,5 +9,7 @@ uint64 tx2
 uint64 rx2
 uint64 tx3
 uint64 rx3
-float32 power1
-float32 power2
+float32 fpp1
+float32 fpp2
+float32 skew1
+float32 skew2

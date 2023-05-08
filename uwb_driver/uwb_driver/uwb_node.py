@@ -61,8 +61,10 @@ class UwbModuleNode(Node):
         super().__init__("uwb_node")
 
         self.declare_parameter("scheduler", "slow")
-        self.declare_parameter("max_id", 10)
+        self.declare_parameter("max_id", 12)
         self.declare_parameter("frequency", 200)
+        self.declare_parameter("from_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
+        self.declare_parameter("to_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
 
     def start(self):
 
@@ -108,7 +110,7 @@ class UwbModuleNode(Node):
         self.range_pub = self.create_publisher(RangeStamped,"uwb/range",1)
 
         # Create single publisher for the passive measurements
-        self.passive_pub = self.create_publisher(PassiveStamped, "uwb/passing", 1) 
+        self.passive_pub = self.create_publisher(PassiveStamped, "uwb/passive", 1) 
 
         # Output neighbour-discovery results 
         self.get_logger().info(
@@ -123,15 +125,7 @@ class UwbModuleNode(Node):
         if self.get_parameter("scheduler").value == "slow":
             self.start_slow_scheduler()
         elif self.get_parameter("scheduler").value == "common_list":
-            # seq = [
-            #     (x["from_id"], x["to_id"])
-            #     for x in rospy.get_param("/uwb/sequence")
-            # ]
-            # scheduler = CommonListScheduler(
-            #     self.modules, self.my_ids, seq, self.publish_range, self.publish_passive
-            # )
-            # scheduler.start()
-            pass
+            self.start_common_list_scheduler()
 
     def discover(self):
         """
@@ -172,8 +166,10 @@ class UwbModuleNode(Node):
             range_msg.rx2 = range_data["rx2"]
             range_msg.tx3 = range_data["tx3"]
             range_msg.rx3 = range_data["rx3"]
-            range_msg.power1 = range_data["Pr1"]
-            range_msg.power2 = range_data["Pr2"]
+            range_msg.fpp1 = range_data["fpp1"]
+            range_msg.fpp2 = range_data["fpp2"]
+            range_msg.skew1 = range_data["skew1"]
+            range_msg.skew2 = range_data["skew2"]
             self.range_pub.publish(range_msg)
 
     def publish_passive(self, pair_ids, passive_data, my_id):
@@ -191,11 +187,16 @@ class UwbModuleNode(Node):
         passive_msg.rx2_n = passive_data["rx2_n"]
         passive_msg.tx3_n = passive_data["tx3_n"]
         passive_msg.rx3_n = passive_data["rx3_n"]
-        passive_msg.pr1 = passive_data["Pr1"]
-        passive_msg.pr2 = passive_data["Pr2"]
-        passive_msg.pr3 = passive_data["Pr3"]
-        passive_msg.pr1_n = passive_data["Pr1_n"]
-        passive_msg.pr2_n = passive_data["Pr2_n"]
+        passive_msg.pr1 = passive_data["fpp1"]
+        passive_msg.pr2 = passive_data["fpp2"]
+        passive_msg.pr3 = passive_data["fpp3"]
+        passive_msg.skew1 = passive_data["skew1"]
+        passive_msg.skew2 = passive_data["skew2"]
+        passive_msg.skew3 = passive_data["skew3"]
+        passive_msg.pr1_n = passive_data["fpp1_n"]
+        passive_msg.pr2_n = passive_data["fpp2_n"]
+        passive_msg.skew1_n = passive_data["skew1_n"]
+        passive_msg.skew2_n = passive_data["skew2_n"]
         self.passive_pub.publish(passive_msg)
 
     def shutdown_hook(self):
@@ -228,6 +229,73 @@ class UwbModuleNode(Node):
                         rate.sleep()
                     except ROSInterruptException:
                         pass
+
+    def start_common_list_scheduler(self):
+        """
+        Starts the distributed scheduling scheme.
+        """
+        seq = list(zip(
+            self.get_parameter("from_id_sequence").get_parameter_value().integer_array_value,
+            self.get_parameter("to_id_sequence").get_parameter_value().integer_array_value
+        ))
+        scheduler = CommonListScheduler(
+            self.modules, 
+            self.my_ids, 
+            seq,
+            self.publish_range, 
+            self.publish_passive,
+        )
+
+        scheduler._latest_pair = None
+        for i, uwb in enumerate(scheduler._modules):
+            # Just for type hinting
+            uwb: UwbModule = uwb
+            
+            my_id = scheduler._my_ids[i]
+            uwb.toggle_passive(True)
+            uwb.register_listening_callback(scheduler.listening_callback, my_id)
+            uwb.register_range_callback(scheduler.ranging_with_me_callback, my_id)
+            uwb.device.timeout = 0.003
+
+        # Initialize the scheme
+        # below may be confusing. we are sending this function the last pair
+        # in the sequence so that the next pair is the first in the sequence.
+        # We are reusing this function for starting the scheme
+        scheduler.handle_ranging_event(scheduler._sequence[-1])
+
+        while rclpy.ok():
+ 
+            # Keep checking the modules for external messages until a timeout
+            # expires.
+            start_time = self.get_clock().now().nanoseconds/1e9
+            timeout = 0.07
+            while (self.get_clock().now().nanoseconds/1e9 - start_time) < timeout and rclpy.ok():
+
+                for uwb in scheduler._modules:
+                    uwb.wait_for_messages()
+
+                    if scheduler._ranging_event:
+                        # Reset the message event flag
+                        scheduler._ranging_event = False
+
+                        # Initiate next ranging if it is our turn
+                        scheduler.handle_ranging_event(scheduler._latest_pair)                        
+
+                        # Reset the timeout. Stays in this while loop
+                        start_time = self.get_clock().now().nanoseconds/1e9
+                    
+            # If we got here, its been a while since we have heard a range meas.
+            # Advance to the next item on the list and initiate if it is our
+            # turn
+            scheduler._latest_pair = scheduler.get_next_pair(scheduler._latest_pair)
+            self.get_logger().debug(
+                "Ranging timeout. Restarting from latest pair: " \
+                + str(scheduler._latest_pair)
+            )
+
+            # Internally, the below function will check if we need to
+            # initate ranging.
+            scheduler.handle_ranging_event(scheduler._latest_pair)
 
 def main():
     rclpy.init()
