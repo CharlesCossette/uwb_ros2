@@ -51,5 +51,5 @@ CMD ["bash", \
      "source /opt/ros/$ROS_DISTRO/setup.bash \
         && source ~/workspace/install/setup.bash \
         && ros2 run uwb_driver uwb_node --ros-args \
-            --log-level WARN \
+            # --log-level WARN \
             --params-file ~/workspace/src/uwb_ros2/uwb_driver/config/params.yaml"]
