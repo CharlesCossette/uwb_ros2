@@ -1,6 +1,6 @@
-FROM osrf/ros:humble-desktop AS development
+FROM osrf/ros:foxy-desktop AS development
 
-ARG USERNAME=ros
+ENV USERNAME=ros
 ARG WORKSPACE=/home/$USERNAME/workspace/src
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
