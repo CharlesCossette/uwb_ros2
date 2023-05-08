@@ -9,7 +9,7 @@
     #scheduler: "hot_potato" # not supported yet
 
     ####################################################################
-    frequency: 100 # ranging frequency in hz
+    frequency: 1000 # ranging frequency in hz
     max_id: 12 # Max possible module ID in the area (used for neighbor discovery)
 
     ####################################################################
