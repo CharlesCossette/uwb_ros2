@@ -61,7 +61,7 @@ class UwbModuleNode(Node):
         super().__init__("uwb_node")
 
         self.declare_parameter("scheduler", "slow")
-        self.declare_parameter("max_id", 12)
+        self.declare_parameter("max_id", 15)
         self.declare_parameter("frequency", 200)
         self.declare_parameter("from_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
         self.declare_parameter("to_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
@@ -214,11 +214,13 @@ class UwbModuleNode(Node):
         range_freq = self.get_parameter("frequency").value
         rate = self.create_rate(range_freq)
         last_ranged = {}
-        is_lost = {i: False for i in self.neighbour_ids}
+        active_tags = self.neighbour_ids
+        lost_tags = []
+        count = 0
         while rclpy.ok():
  
             # Loop through all the neighbors
-            for nb_id in self.neighbour_ids:
+            for nb_id in active_tags:
 
                 # Loop through the  modules attached to our machine
                 for i, uwb in enumerate(self.modules):
@@ -226,11 +228,12 @@ class UwbModuleNode(Node):
 
                     # Dont range between same tags on machine, or any dropped
                     # tags.
-                    if nb_id not in self.my_ids and not is_lost[nb_id]: 
+                    if nb_id not in self.my_ids and nb_id not in lost_tags:
                         
                         # If its been too long since last ranged, tag is considered lost
                         if nb_id in last_ranged and (self.get_clock().now() - last_ranged[nb_id]).nanoseconds > 1e9:
-                            is_lost[nb_id] = True
+                            lost_tags.append(nb_id)
+                            active_tags.remove(nb_id)
                             self.get_logger().info("Tag " + str(nb_id) + " lost!")
                             break
                         
@@ -244,6 +247,19 @@ class UwbModuleNode(Node):
                         rate.sleep()
                     except ROSInterruptException:
                         pass
+
+            count += 1 
+            if count == 100:
+                for nb_id in lost_tags:
+                    uwb = self.modules[0]
+                    range_data = uwb.do_twr(target_id=nb_id, mult_twr=True)
+                    if range_data["is_valid"]:
+                        last_ranged[nb_id] = self.get_clock().now()
+                        self.publish_range((self.my_ids[0], nb_id), range_data)
+                        self.get_logger().info("Tag " + str(nb_id) + " regained!")
+                        lost_tags.remove(nb_id)
+                        active_tags.append(nb_id)
+                count = 0
 
     def start_common_list_scheduler(self):
         """
