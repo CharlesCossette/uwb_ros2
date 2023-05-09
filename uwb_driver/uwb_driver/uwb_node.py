@@ -139,7 +139,7 @@ class UwbModuleNode(Node):
 
         rate = self.create_rate(3)
         for i, uwb in enumerate(self.modules):
-            tag_ids = uwb.do_discovery(list(range(max_id)))
+            tag_ids = uwb.do_discovery(list(range(max_id+1)))
             self.get_logger().info(
                 "Tag "
                 + str(self.my_ids[i])
