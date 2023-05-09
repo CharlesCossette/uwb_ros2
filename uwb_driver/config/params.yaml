@@ -10,7 +10,7 @@
 
     ####################################################################
     frequency: 1000 # ranging frequency in hz
-    max_id: 12 # Max possible module ID in the area (used for neighbor discovery)
+    max_id: 15 # Max possible module ID in the area (used for neighbor discovery)
 
     ####################################################################
     # Sequence of range measurements. Used for "common_list" scheduler
