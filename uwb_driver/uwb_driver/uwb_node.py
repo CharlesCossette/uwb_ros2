@@ -65,6 +65,7 @@ class UwbModuleNode(Node):
         self.declare_parameter("frequency", 200)
         self.declare_parameter("from_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
         self.declare_parameter("to_id_sequence", rclpy.Parameter.Type.INTEGER_ARRAY)
+        self.declare_parameter("timeout", 0.1)
 
     def start(self):
 
@@ -75,9 +76,10 @@ class UwbModuleNode(Node):
 
             self.get_logger().info("Checking for UWB modules...")
             ports = find_uwb_serial_ports()
+            timeout = self.get_parameter("timeout").value
             if len(ports) > 0:
                 self.get_logger().info("Found UWB modules: " + str(ports))
-                self.modules = [UwbModule(port, timeout=0.1, verbose=False, threaded=False) for port in ports]
+                self.modules = [UwbModule(port, timeout=timeout, verbose=False, threaded=False) for port in ports]
                 break
 
             self.get_logger().info("Checking for pozyx modules...")
@@ -85,7 +87,7 @@ class UwbModuleNode(Node):
             pozyx_ports = [p.device for p in pozyx_ports]
             if len(pozyx_ports) > 0:
                 self.get_logger().info("Found pozyx modules: " + str(pozyx_ports))
-                self.modules = [PozyxModule(p) for p in pozyx_ports]
+                self.modules = [PozyxModule(p, timeout=timeout) for p in pozyx_ports]
                 break
 
             self.get_logger().warn("No UWB modules found. Will keep trying.")
@@ -211,6 +213,8 @@ class UwbModuleNode(Node):
         """
         range_freq = self.get_parameter("frequency").value
         rate = self.create_rate(range_freq)
+        last_ranged = {}
+        is_lost = {i: False for i in self.neighbour_ids}
         while rclpy.ok():
  
             # Loop through all the neighbors
@@ -219,10 +223,21 @@ class UwbModuleNode(Node):
                 # Loop through the  modules attached to our machine
                 for i, uwb in enumerate(self.modules):
                     my_id = self.my_ids[i]
-                    if nb_id not in self.my_ids: # No self-ranging.
+
+                    # Dont range between same tags on machine, or any dropped
+                    # tags.
+                    if nb_id not in self.my_ids and not is_lost[nb_id]: 
+                        
+                        # If its been too long since last ranged, tag is considered lost
+                        if nb_id in last_ranged and (self.get_clock().now() - last_ranged[nb_id]).nanoseconds > 1e9:
+                            is_lost[nb_id] = True
+                            self.get_logger().info("Tag " + str(nb_id) + " lost!")
+                            break
+                        
 
                         range_data = uwb.do_twr(target_id=nb_id, mult_twr=True)
                         if range_data["is_valid"]:
+                            last_ranged[nb_id] = self.get_clock().now()
                             self.publish_range((my_id, nb_id), range_data)
 
                     try:  # Prevent garbage in console output when killed
